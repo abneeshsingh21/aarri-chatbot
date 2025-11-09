@@ -1,0 +1,14 @@
+# render.yaml - Render one-click / repo-based deployment config
+services:
+  - type: web
+    name: aari-backend
+    env: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r backend/requirements-dev.txt
+    startCommand: gunicorn backend.app:app --workers 2 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: GROQ_API_KEY
+        value: ""      # leave empty in repo; fill on Render UI
+      - key: GROQ_MODEL
+        value: "phi-3" # default value, change if needed
