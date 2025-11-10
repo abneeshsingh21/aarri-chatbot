@@ -6,3 +6,4 @@ requests==2.32.5
 openai==2.7.1        # Groq-compatible OpenAI-like client
 SQLAlchemy==2.0.44
 gTTS==2.5.4          # optional, only if you use TTS server-side
+gunicorn
