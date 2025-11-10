@@ -1,47 +1,74 @@
-# backend/Dockerfile
+# Dockerfile (place at repo root OR backend/Dockerfile - adjust build command accordingly)
 FROM python:3.11-slim
 
-# Prevents python from writing .pyc files and buffers stdout/stderr (good for logs)
+# ---- Basic env ----
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
-
-# Create a non-root user for safety
-RUN groupadd -r aarii && useradd -r -g aarii aarii
-
-# system deps commonly needed by Python packages (add/remove as needed)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    git \
-    curl \
-  && rm -rf /var/lib/apt/lists/*
-
+ARG APP_USER=aarii
+ARG APP_GROUP=aarii
 WORKDIR /app
 
-# Copy only dependency files first for better caching
-COPY backend/requirements.txt backend/requirements-dev.txt* /app/
+# ---- Install system dependencies ----
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+     build-essential gcc git curl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip & install runtime (and gunicorn)
+# ---- Create non-root user ----
+RUN groupadd -r ${APP_GROUP} && useradd -r -g ${APP_GROUP} ${APP_USER}
+
+# ---- Copy repo into image ----
+# copy everything so that backend/ remains a package if present
+COPY . /app
+
+# ---- Ensure files present (optional) ----
+# (this is just to help caching: copy requirements again if build context large)
+# Install Python packages:
 RUN python -m pip install --upgrade pip setuptools wheel \
- && python -m pip install --no-cache-dir -r requirements.txt \
+ && if [ -f /app/backend/requirements.txt ]; then \
+      python -m pip install --no-cache-dir -r /app/backend/requirements.txt; \
+    elif [ -f /app/requirements.txt ]; then \
+      python -m pip install --no-cache-dir -r /app/requirements.txt; \
+    else \
+      echo "Warning: no requirements.txt found in /app/backend or /app"; \
+    fi \
  && python -m pip install --no-cache-dir gunicorn
 
-# Optional: install dev requirements if file exists
-# (this won't fail if requirements-dev.txt doesn't exist thanks to the wildcard usage)
-RUN if [ -f requirements-dev.txt ]; then python -m pip install --no-cache-dir -r requirements-dev.txt ; fi
+# ---- Create entrypoint.sh that picks correct module at runtime ----
+RUN mkdir -p /app/scripts \
+ && cat > /app/scripts/entrypoint.sh <<'EOF' \
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Copy application code
-COPY backend/ /app/
+PORT="${PORT:-8080}"
 
-# Set file ownership to non-root user
-RUN chown -R aarii:aarii /app
-USER aarii
+# Choose module to run:
+if [ -f "/app/backend/app.py" ]; then
+  MODULE="backend.app:app"
+  echo "Entrypoint: using module backend.app:app"
+elif [ -f "/app/app.py" ]; then
+  MODULE="app:app"
+  echo "Entrypoint: using module app:app"
+else
+  echo "ERROR: Could not find /app/backend/app.py or /app/app.py"
+  ls -la /app
+  exit 1
+fi
 
-# Expose the port that Railway expects (the container uses PORT env var at runtime)
+# If Railway or host provides a PORT env var, Gunicorn will bind to it.
+exec gunicorn -b "0.0.0.0:${PORT}" "${MODULE}" \
+  --workers 2 --timeout 120 --access-logfile - --error-logfile -
+EOF
+
+# Make entrypoint executable
+RUN chmod +x /app/scripts/entrypoint.sh
+
+# Fix ownership and switch to non-root
+RUN chown -R ${APP_USER}:${APP_GROUP} /app
+USER ${APP_USER}
+
 EXPOSE 8080
 
-# Use Gunicorn to serve the app; adjust module path if your app isn't backend/app.py
-#  - workers: 2 (adjust based on CPU / memory)
-#  - timeout: 120 (avoid premature worker kills during long requests)
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "backend.app:app", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+# Use the entrypoint script
+CMD ["/app/scripts/entrypoint.sh"]
