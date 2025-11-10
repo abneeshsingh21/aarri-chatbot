@@ -1,23 +1,21 @@
-# backend/Dockerfile -- Flask app served with gunicorn
+# backend/Dockerfile
 FROM python:3.11-slim
+
+# system deps for many python packages (add more if your packages need them)
+RUN apt-get update && apt-get install -y build-essential gcc git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# install build deps (if needed) and cleanup
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
- && rm -rf /var/lib/apt/lists/*
+# copy only what's needed first for better caching
+COPY backend/requirements.txt backend/requirements-dev.txt /app/
+RUN python -m pip install --upgrade pip setuptools wheel
+RUN python -m pip install -r requirements.txt
+# Optional dev requirements:
+# RUN python -m pip install -r requirements-dev.txt
 
-# copy requirements and install
-COPY backend/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# copy app code
+COPY backend/ /app/
 
-# copy app source
-COPY backend /app/backend
-
-# expose port (Render uses $PORT at runtime)
-ENV PORT=8000
-EXPOSE ${PORT}
-
-# use gunicorn to run the Flask app (module: backend.app, variable: app)
-CMD ["gunicorn", "backend.app:app", "--workers", "2", "--bind", "0.0.0.0:$PORT"]
+# If your Flask app entry is app.py and app variable is `app`
+ENV PORT=8080
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app", "--workers", "2", "--timeout", "120"]
