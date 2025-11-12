@@ -3,8 +3,9 @@ services:
     name: aarii-chatbot-backend
     env: python
     plan: free
-    buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: cd backend && gunicorn -w 2 -b 0.0.0.0:$PORT app:app
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: sh -c 'cd backend && gunicorn -w 2 -b 0.0.0.0:$PORT app:app'
+    workingDirectory: backend
     healthCheckPath: /health
     
     envVars:
