@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Cache buster: force fresh build (numpy 1.x compatibility fix)
+# Updated 2025-11-12T17:05:00Z
+
 # Copy the entire backend first to ensure all files are in the build context
 COPY backend/ .
 
