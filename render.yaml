@@ -1,11 +1,9 @@
 services:
   - type: web
     name: aarii-chatbot-backend
-    env: python
+    env: docker
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: sh -c 'cd backend && gunicorn -w 2 -b 0.0.0.0:$PORT app:app'
-    workingDirectory: backend
+    dockerfile: ./Dockerfile
     healthCheckPath: /health
     
     envVars:
