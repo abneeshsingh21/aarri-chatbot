@@ -70,7 +70,7 @@ except Exception as exc:  # pragma: no cover - optional module
     logger.warning("Mode routes NOT registered: %s", exc)
 
 
-# Optional: initialize DBs / memory indices if modules exist
+# Optional: initialize DB (database is lightweight)
 try:
     # Ensure SQLAlchemy models and DB created
     from database.models import init_db as _init_db
@@ -81,19 +81,31 @@ except Exception as exc:  # pragma: no cover - optional module
     logger.info("Database init skipped or failed: %s", exc)
 
 
-try:
-    # Ensure FAISS + memory DB created
-    from memory.store import init_db as _init_mem_db
+# Defer FAISS initialization to avoid worker timeout during startup
+# It will be lazy-loaded on first request
+_memory_store_initialized = False
 
-    _init_mem_db()
-    logger.info("Memory store initialized")
-except Exception as exc:  # pragma: no cover - optional module
-    logger.info("Memory store init skipped or failed: %s", exc)
+
+def _ensure_memory_initialized():
+    """Lazy-load memory store on first use."""
+    global _memory_store_initialized
+    if not _memory_store_initialized:
+        try:
+            from memory.store import init_db as _init_mem_db
+
+            _init_mem_db()
+            logger.info("Memory store initialized (lazy-loaded)")
+            _memory_store_initialized = True
+        except Exception as exc:  # pragma: no cover - optional module
+            logger.info("Memory store init skipped or failed: %s", exc)
+            _memory_store_initialized = True
 
 
 # Basic health endpoint
 @app.route("/", methods=["GET"])
 def home():
+    # Trigger lazy memory initialization on first request
+    _ensure_memory_initialized()
     return jsonify(
         {
             "message": "🚀 Aarii AI Backend is running successfully!",

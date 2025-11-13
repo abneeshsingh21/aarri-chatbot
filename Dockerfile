@@ -18,5 +18,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests, sys; r=requests.get('http://localhost:5000/health', timeout=5); sys.exit(0 if r.status_code==200 else 1)"
 
-# Run the Flask app with gunicorn
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "app:app"]
+# Run the Flask app with gunicorn (increased timeout for FAISS initialization)
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "--timeout", "120", "app:app"]
