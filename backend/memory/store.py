@@ -13,9 +13,17 @@ SQLITE_FILE = os.path.join(BASE, "..", "aarii_memory_meta.sqlite")
 INDEX_FILE = os.path.join(BASE, "faiss_index.index")
 
 MODEL_NAME = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
-# instantiate model (keeps code simple; heavy import handled in CI/runtime)
-emb_model = SentenceTransformer(MODEL_NAME)
-EMBED_DIM = emb_model.get_sentence_embedding_dimension()
+# Lazy-load model on first use to avoid startup delays
+emb_model = None
+EMBED_DIM = 384  # all-MiniLM-L6-v2 default dimension
+
+
+def _get_embedding_model():
+    """Lazy-load the embedding model on first use."""
+    global emb_model
+    if emb_model is None:
+        emb_model = SentenceTransformer(MODEL_NAME)
+    return emb_model
 
 
 def _conn():
@@ -88,7 +96,8 @@ def add_memory(session_id: str, text: str, meta: dict = None):
     conn.close()
 
     # embed and add to FAISS
-    vec = emb_model.encode([text])
+    model = _get_embedding_model()
+    vec = model.encode([text])
     arr = np.array(vec, dtype="float32")
     vec = _normalize(arr)
 
@@ -121,7 +130,8 @@ def query_memory(
     idx = _load_index()
     if idx.ntotal == 0:
         return []
-    q = emb_model.encode([query])
+    model = _get_embedding_model()
+    q = model.encode([query])
     arr = np.array(q, dtype="float32")
     q = _normalize(arr)
     distances, indexes = idx.search(q, top_k)
