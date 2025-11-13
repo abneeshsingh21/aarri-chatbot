@@ -101,11 +101,9 @@ def _ensure_memory_initialized():
             _memory_store_initialized = True
 
 
-# Basic health endpoint
+# Basic health endpoint (no heavy initialization)
 @app.route("/", methods=["GET"])
 def home():
-    # Trigger lazy memory initialization on first request
-    _ensure_memory_initialized()
     return jsonify(
         {
             "message": "🚀 Aarii AI Backend is running successfully!",
