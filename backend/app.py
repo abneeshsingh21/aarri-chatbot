@@ -77,8 +77,10 @@ try:
 
     _init_db()
     logger.info("Database initialized")
+except ImportError:
+    logger.warning("Database module not available")
 except Exception as exc:  # pragma: no cover - optional module
-    logger.info("Database init skipped or failed: %s", exc)
+    logger.warning("Database init skipped or failed: %s", exc)
 
 
 # Defer FAISS initialization to avoid worker timeout during startup
@@ -97,7 +99,7 @@ def _ensure_memory_initialized():
             logger.info("Memory store initialized (lazy-loaded)")
             _memory_store_initialized = True
         except Exception as exc:  # pragma: no cover - optional module
-            logger.info("Memory store init skipped or failed: %s", exc)
+            logger.warning("Memory store init failed (will skip): %s", exc)
             _memory_store_initialized = True
 
 
@@ -114,14 +116,16 @@ def home():
     )
 
 
-# JSON error handler for uncaught exceptions (useful during dev)
+# JSON error handler for uncaught exceptions
 @app.errorhandler(Exception)
 def handle_exception(e):
-    # log the exception server-side
-    logger.exception("Unhandled exception: %s", e)
-    # return JSON response
+    try:
+        logger.exception("Unhandled exception: %s", e)
+    except Exception:
+        pass
+    # Always return safe JSON response
     return (
-        jsonify({"error": "internal_server_error", "message": str(e)}),
+        jsonify({"error": "internal_server_error", "message": "Server error"}),
         500,
     )
 
