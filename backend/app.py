@@ -21,8 +21,8 @@ cors_origins = [
     "http://localhost:5000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5000",
-    "https://*.github.io",
-    "https://aarii-backend.onrender.com",
+    "https://abneeshsingh21.github.io",
+    "https://aarri-chatbot-7.onrender.com",
     os.getenv("FRONTEND_URL", "*"),
 ]
 
@@ -31,6 +31,7 @@ CORS(
     resources={r"/api/*": {"origins": cors_origins}},
     supports_credentials=True,
 )
+logger.info("CORS configured for origins: %s", cors_origins)
 
 
 # Import and register route blueprints (best-effort)
@@ -112,6 +113,18 @@ def home():
             "status": "ok",
             "provider": os.getenv("GROQ_PROVIDER", "Groq API"),
             "model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+        }
+    )
+
+
+# Debug endpoint to check app state
+@app.route("/debug", methods=["GET"])
+def debug():
+    return jsonify(
+        {
+            "debug": "enabled",
+            "memory_initialized": _memory_store_initialized,
+            "cors_origins": cors_origins,
         }
     )
 
